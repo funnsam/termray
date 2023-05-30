@@ -4,6 +4,8 @@ use std::io::{stdout, Write};
 use std::time::Duration;
 use std::f64::consts::TAU;
 
+pub const SCREENSHOT_SIZE: usize = 2048;
+
 pub fn init() -> core::result::Result<u16, Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
     execute!(stdout(),
@@ -69,56 +71,56 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                 prep_exit()?;
                 std::process::exit(0);
             },
-            Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+            Event::Key(KeyEvent { code: KeyCode::F(12), .. }) => {
                 use std::path::Path;
                 use std::fs::File;
                 use std::io::BufWriter;
+
+                let mut so = stdout();
+                queue!(so,
+                    cursor::MoveTo(0, 0),
+                    style::PrintStyledContent(format!("Rendering...")
+                        .with(Color::White)
+                        .on  (Color::DarkGrey)
+                    )
+                ).unwrap();
+                so.flush().unwrap();
 
                 let path = Path::new(r"image_out.png");
                 let file = File::create(path).unwrap();
                 let ref mut w = BufWriter::new(file);
 
-                let mut encoder = png::Encoder::new(w, 1024, 1024);
-                encoder.set_color(png::ColorType::Rgba);
+                let mut encoder = png::Encoder::new(w, SCREENSHOT_SIZE as u32, SCREENSHOT_SIZE as u32);
+                encoder.set_color(png::ColorType::Rgb);
                 encoder.set_depth(png::BitDepth::Eight);
 
                 let mut writer = encoder.write_header().unwrap();
-                let 
+                let mut buf = Vec::with_capacity(SCREENSHOT_SIZE * SCREENSHOT_SIZE * 3);
+                let img = crate::renderer::render(state, SCREENSHOT_SIZE);
+                for y in img.iter() {
+                    for x in y.iter() {
+                        buf.push(x.0);
+                        buf.push(x.1);
+                        buf.push(x.2);
+                    }
+                }
+                writer.write_image_data(&buf).unwrap();
             },
+  
+            Event::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new( 0.25, 0.0, 0.0), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(-0.25, 0.0, 0.0), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0,  0.25, 0.0), state.rot), 
+            Event::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, -0.25, 0.0), state.rot), 
+            Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0,  0.25), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0, -0.25), state.rot),
 
-            Event::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new( 0.25, 0.0, 0.0),
-            Event::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(-0.25, 0.0, 0.0),
-            Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(0.0,  0.25, 0.0), 
-            Event::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(0.0, -0.25, 0.0), 
-            Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(0.0, 0.0,  0.25),
-            Event::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(0.0, 0.0, -0.25),
-
-            Event::Key(KeyEvent { code: KeyCode::Down, .. })  => state.rot[1] += 1.0 / 8.0 *  TAU, 
-            Event::Key(KeyEvent { code: KeyCode::Up, .. })    => state.rot[1] += 1.0 / 8.0 * -TAU, 
-            // Event::Key(KeyEvent { code: KeyCode::Up, .. })    => state.cam_dir.yz() = Rotation2::new(Vector2::x() * 1.0 / 8.0 * std::f32::consts::TAU) * state.cam_dir.yz(),
-            // Event::Key(KeyEvent { code: KeyCode::Left, .. })  => state.cam_dir.yz() = Rotation2::new(Vector2::x() * 1.0 / 8.0 * std::f32::consts::TAU) * state.cam_dir.yz(),
-            // Event::Key(KeyEvent { code: KeyCode::Right, .. }) => state.cam_dir.yz() = Rotation2::new(Vector2::x() * 1.0 / 8.0 * std::f32::consts::TAU) * state.cam_dir.yz(),
+            Event::Key(KeyEvent { code: KeyCode::Down , kind: KeyEventKind::Press, .. }) => state.rot[0] += 1.0 / 8.0 * TAU, 
+            Event::Key(KeyEvent { code: KeyCode::Up   , kind: KeyEventKind::Press, .. }) => state.rot[0] -= 1.0 / 8.0 * TAU, 
+            Event::Key(KeyEvent { code: KeyCode::Right, kind: KeyEventKind::Press, .. }) => state.rot[1] += 1.0 / 8.0 * TAU, 
+            Event::Key(KeyEvent { code: KeyCode::Left , kind: KeyEventKind::Press, .. }) => state.rot[1] -= 1.0 / 8.0 * TAU, 
             _ => ()
         }
     }
 
-    state.cam_dir = insert_x(state.cam_dir, rotate(state.rot[0]) * state.cam_dir.yz());
-    state.cam_dir = insert_y(state.cam_dir, rotate(state.rot[1]) * state.cam_dir.xz());
-    state.rot = Vector2::default();
-
     Ok(())
-}
-
-fn rotate(v: f64) -> Matrix2<f64> {
-    let s = v.sin();
-    let c = v.cos();
-    Matrix2::new(c, -s, s, c)
-}
-
-fn insert_x(va: Vector3<f64>, vb: Vector2<f64>) -> Vector3<f64> {
-    Vector3::new(va[0], vb[0], vb[1])
-}
-
-fn insert_y(va: Vector3<f64>, vb: Vector2<f64>) -> Vector3<f64> {
-    Vector3::new(vb[0], va[1], vb[1])
 }

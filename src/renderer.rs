@@ -6,7 +6,7 @@ pub const SAMPLES_LVL   : usize = 4;
 // #[derive(Default)]
 pub struct RendererState<'a> {
     pub cam_pos: Vector3<f64>,
-    pub cam_dir: Vector3<f64>,
+    // pub cam_dir: Vector3<f64>,
 
     pub rot: Vector2<f64>,
     
@@ -17,7 +17,7 @@ impl<'a> Default for RendererState<'a> {
     fn default() -> Self {
         Self {
             cam_pos: Vector3::default(),
-            cam_dir: Vector3::z(),
+//            cam_dir: Vector3::z(),
             rot: Vector2::default(),
             scene: Vec::new()
         }
@@ -51,6 +51,28 @@ pub struct HitInfo {
     pub t: f64,
 }
 
+pub fn rotate(p: Vector3<f64>, r: Vector2<f64>) -> Vector3<f64> {
+    fn rot(v: f64) -> Matrix2<f64> {
+        let s = v.sin();
+        let c = v.cos();
+        Matrix2::new(c, -s, s, c)
+    }
+
+    fn insert_x(va: Vector3<f64>, vb: Vector2<f64>) -> Vector3<f64> {
+        Vector3::new(va[0], vb[0], vb[1])
+    }
+
+    fn insert_y(va: Vector3<f64>, vb: Vector2<f64>) -> Vector3<f64> {
+        Vector3::new(vb[0], va[1], vb[1])
+    }
+
+    let mut rt = p.normalize();
+    rt = insert_x(rt, rot(r[0]) * rt.yz());
+    rt = insert_y(rt, rot(r[1]) * rt.xz());
+
+    rt
+}
+
 pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
     let mut scr = vec![vec![(0, 0, 0); size]; size];
     for ay in 0..size {
@@ -62,6 +84,8 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
 
             for ix in 0..SAMPLES_LVL {
                 for iy in 0..SAMPLES_LVL {
+
+
                     let offx = (ix as f64 / SAMPLES_LVL as f64) - 0.5;
                     let offy = (iy as f64 / SAMPLES_LVL as f64) - 0.5;
                     let px = (x + offx) / size as f64 * 2.0 - 1.0;
@@ -69,10 +93,8 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
 
                     let ray_pos = rs.cam_pos;
 
-                    let ray_dir = (
-                        rs.cam_dir +
-                        Vector3::new(px, py, 0.0)
-                    ).normalize();
+                    let mut ray_dir = rotate(Vector3::new(px, py, 1.0).normalize(), rs.rot);
+
                     let ray = Ray::new(ray_pos, ray_dir);
 
                     c += ray.get_color(&rs.scene, 0);
@@ -147,8 +169,11 @@ impl Ray {
         let h = self.try_hit(s);
         if h.is_some() {
             let (h, o) = h.unwrap();
-            let nr = Ray::new(h.p, h.n);
-            nr.get_color(s, i+1) * (1.0 - o.material.rfness) + o.material.color * o.material.rfness
+            let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
+            let specular_ray = Ray::new(h.p, specular_dir);
+
+            // let reflect_ray = Ray::new(h.p, h.n);
+            specular_ray.get_color(s, i+1) * o.material.rfness + o.material.color * (1.0 - o.material.rfness)
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
             (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) +

@@ -13,15 +13,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let m1 = Material {
         color: Vector3::new(0.25, 0.0, 0.0),
-        rfness: 0.3
+        rfness: 1.0
     };
     let m2 = Material {
         color: Vector3::new(0.0, 0.25, 0.0),
-        rfness: 0.4
+        rfness: 1.0
     };
     let m3 = Material {
         color: Vector3::new(0.0, 0.0, 0.25),
-        rfness: 0.5
+        rfness: 0.1
     };
 
     let s1 = Sphere {
