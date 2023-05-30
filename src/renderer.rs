@@ -37,6 +37,7 @@ impl<'a> Object<'a> {
 
 pub struct Material {
     pub color: Vector3<f64>,
+    pub emit_color: Vector3<f64>,
     pub rfness: f64
 }
 
@@ -80,7 +81,7 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
             let x = (size - ax - 1) as f64;
             let y = (size - ay - 1) as f64;
 
-            let mut c = Vector3::new(0.0, 0.0, 0.0);
+            let mut c = Vector3::default();
 
             for ix in 0..SAMPLES_LVL {
                 for iy in 0..SAMPLES_LVL {
@@ -92,16 +93,19 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
                     let py = (y + offy) / size as f64 * 2.0 - 1.0;
 
                     let ray_pos = rs.cam_pos;
-
-                    let mut ray_dir = rotate(Vector3::new(px, py, 1.0).normalize(), rs.rot);
+                    let ray_dir = rotate(Vector3::new(px, py, 1.0).normalize(), rs.rot);
 
                     let ray = Ray::new(ray_pos, ray_dir);
 
-                    c += ray.get_color(&rs.scene, 0);
+                    let r = ray.get_color(&rs.scene, 0);
+                    c[0] += r.0[0] * r.1[0];
+                    c[1] += r.0[1] * r.1[1];
+                    c[2] += r.0[2] * r.1[2];
                 }
             }
 
             c /= (SAMPLES_LVL * SAMPLES_LVL) as f64;
+
             scr[ay][ax] = (map(c[0]), map(c[1]), map(c[2]));
         }
     }
@@ -163,20 +167,32 @@ impl Ray {
         r
     }
 
-    pub fn get_color<'a>(&self, s: &Vec<Object<'a>>, i: usize) -> Vector3<f64> {
-        if i == LIGHT_BOUNCES { return Vector3::new(0.0, 0.0, 0.0) }
+    pub fn get_color<'a>(&self, s: &Vec<Object<'a>>, i: usize) -> (Vector3<f64>, Vector3<f64>) {
+        if i == LIGHT_BOUNCES {
+            return (
+                Vector3::default(),
+                Vector3::default()
+            )
+        }
 
         let h = self.try_hit(s);
         if h.is_some() {
             let (h, o) = h.unwrap();
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
             let specular_ray = Ray::new(h.p, specular_dir);
+            let srr = specular_ray.get_color(s, i+1);
 
-            specular_ray.get_color(s, i+1) * o.material.rfness + o.material.color * (1.0 - o.material.rfness)
+            (
+                srr.0 * o.material.rfness + o.material.color * (1.0 - o.material.rfness),
+                srr.1 * (0.5 + o.material.rfness * 0.5) + o.material.emit_color
+            )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
-            (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) +
-                t * Vector3::new(0.5, 0.7, 1.0)
+            let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
+            (
+                sc,
+                Vector3::new(0.5, 0.7, 1.0)
+            )
         }
     }
 }
