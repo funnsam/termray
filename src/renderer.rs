@@ -172,7 +172,6 @@ impl Ray {
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
             let specular_ray = Ray::new(h.p, specular_dir);
 
-            // let reflect_ray = Ray::new(h.p, h.n);
             specular_ray.get_color(s, i+1) * o.material.rfness + o.material.color * (1.0 - o.material.rfness)
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
