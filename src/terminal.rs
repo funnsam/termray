@@ -29,7 +29,7 @@ pub fn prep_exit() -> core::result::Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn push_image(image: Vec<Vec<(u8, u8, u8)>>, tfps: f64, rfps: f64) -> core::result::Result<(), Box<dyn std::error::Error>> {
+pub fn push_image(image: Vec<Vec<(u8, u8, u8)>>, msg: &str) -> core::result::Result<(), Box<dyn std::error::Error>> {
     let mut so = stdout();
     queue!(so, cursor::MoveTo(0, 0))?;
     for y in image.chunks(2) {
@@ -49,9 +49,9 @@ pub fn push_image(image: Vec<Vec<(u8, u8, u8)>>, tfps: f64, rfps: f64) -> core::
 
     queue!(so,
         terminal::Clear(terminal::ClearType::CurrentLine),
-        style::PrintStyledContent(format!("r {rfps:.1} t {tfps:.1}")
-            .with(Color::White)
-            .on  (Color::DarkGrey)
+        style::PrintStyledContent(
+            msg .with(Color::White)
+                .on  (Color::DarkGrey)
         )
     )?;
 
@@ -60,12 +60,13 @@ pub fn push_image(image: Vec<Vec<(u8, u8, u8)>>, tfps: f64, rfps: f64) -> core::
     Ok(())
 }
 
-pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) -> core::result::Result<(), Box<dyn std::error::Error>> {
-    if poll(
+pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) -> core::result::Result<bool, Box<dyn std::error::Error>> {
+    let pr = poll(
         Duration::from_millis(
             30_u128.checked_sub(el.as_millis()).unwrap_or(0) as u64
         )
-    )? {
+    )?;
+    if pr {
         match read()? {
             Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
                 prep_exit()?;
@@ -96,7 +97,13 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
 
                 let mut writer = encoder.write_header().unwrap();
                 let mut buf = Vec::with_capacity(SCREENSHOT_SIZE * SCREENSHOT_SIZE * 3);
-                let img = crate::renderer::render(state, SCREENSHOT_SIZE);
+
+                let mut img = vec![vec![Vector3::default(); SCREENSHOT_SIZE]; SCREENSHOT_SIZE];
+                for i in 0..8 {
+                    crate::renderer::render(state, SCREENSHOT_SIZE, &mut img, i);
+                }
+                let img = crate::renderer::render(state, SCREENSHOT_SIZE, &mut img, 8+1);
+
                 for y in img.iter() {
                     for x in y.iter() {
                         buf.push(x.0);
@@ -107,12 +114,12 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                 writer.write_image_data(&buf).unwrap();
             },
   
-            Event::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new( 0.25, 0.0, 0.0), state.rot),
-            Event::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(-0.25, 0.0, 0.0), state.rot),
-            Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0,  0.25, 0.0), state.rot), 
-            Event::Key(KeyEvent { code: KeyCode::Char('e'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, -0.25, 0.0), state.rot), 
-            Event::Key(KeyEvent { code: KeyCode::Char('w'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0,  0.25), state.rot),
-            Event::Key(KeyEvent { code: KeyCode::Char('s'), .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0, -0.25), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('a'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new( 0.25, 0.0, 0.0), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('d'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(-0.25, 0.0, 0.0), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('q'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0,  0.25, 0.0), state.rot), 
+            Event::Key(KeyEvent { code: KeyCode::Char('e'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, -0.25, 0.0), state.rot), 
+            Event::Key(KeyEvent { code: KeyCode::Char('w'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0,  0.25), state.rot),
+            Event::Key(KeyEvent { code: KeyCode::Char('s'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::new(0.0, 0.0, -0.25), state.rot),
 
             Event::Key(KeyEvent { code: KeyCode::Down , kind: KeyEventKind::Press, .. }) => state.rot[0] += 1.0 / 8.0 * TAU, 
             Event::Key(KeyEvent { code: KeyCode::Up   , kind: KeyEventKind::Press, .. }) => state.rot[0] -= 1.0 / 8.0 * TAU, 
@@ -122,5 +129,5 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
         }
     }
 
-    Ok(())
+    Ok(pr)
 }

@@ -1,27 +1,14 @@
-use nalgebra::{base::*, geometry::*};
+use nalgebra::base::*;
+use rand::Rng;
 
 pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 4;
 
-// #[derive(Default)]
+#[derive(Default)]
 pub struct RendererState<'a> {
     pub cam_pos: Vector3<f64>,
-    // pub cam_dir: Vector3<f64>,
-
     pub rot: Vector2<f64>,
-    
     pub scene: Vec<Object<'a>>
-}
-
-impl<'a> Default for RendererState<'a> {
-    fn default() -> Self {
-        Self {
-            cam_pos: Vector3::default(),
-//            cam_dir: Vector3::z(),
-            rot: Vector2::default(),
-            scene: Vec::new()
-        }
-    }
 }
 
 pub struct Object<'a> {
@@ -38,7 +25,8 @@ impl<'a> Object<'a> {
 pub struct Material {
     pub color: Vector3<f64>,
     pub emit_color: Vector3<f64>,
-    pub rfness: f64
+    pub reflective: f64,
+    pub rough: f64
 }
 
 pub trait ObjectKind {
@@ -74,8 +62,9 @@ pub fn rotate(p: Vector3<f64>, r: Vector2<f64>) -> Vector3<f64> {
     rt
 }
 
-pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
-    let mut scr = vec![vec![(0, 0, 0); size]; size];
+pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector3<f64>>>, passes_done: usize) -> Vec<Vec<(u8, u8, u8)>> {
+    let scr_f = prev_img;
+    let mut scr_i = vec![vec![(0, 0, 0); size]; size];
     for ay in 0..size {
         for ax in 0..size {
             let x = (size - ax - 1) as f64;
@@ -85,8 +74,6 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
 
             for ix in 0..SAMPLES_LVL {
                 for iy in 0..SAMPLES_LVL {
-
-
                     let offx = (ix as f64 / SAMPLES_LVL as f64) - 0.5;
                     let offy = (iy as f64 / SAMPLES_LVL as f64) - 0.5;
                     let px = (x + offx) / size as f64 * 2.0 - 1.0;
@@ -106,10 +93,12 @@ pub fn render(rs: &mut RendererState, size: usize) -> Vec<Vec<(u8, u8, u8)>> {
 
             c /= (SAMPLES_LVL * SAMPLES_LVL) as f64;
 
-            scr[ay][ax] = (map(c[0]), map(c[1]), map(c[2]));
+            scr_f[ay][ax] += c;
+            c = scr_f[ay][ax] / passes_done as f64;
+            scr_i[ay][ax] = (map(c[0]), map(c[1]), map(c[2]));
         }
     }
-    scr
+    scr_i
 }
 
 fn map(v: f64) -> u8 { (v.sqrt() * 255.0).min(255.0) as u8 }
@@ -179,20 +168,36 @@ impl Ray {
         if h.is_some() {
             let (h, o) = h.unwrap();
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
-            let specular_ray = Ray::new(h.p, specular_dir);
-            let srr = specular_ray.get_color(s, i+1);
+            let diffuse_dir  = h.p + h.n + generate_random_sphere().normalize();
+
+            let indirect_ray = Ray::new(h.p, specular_dir.lerp(&diffuse_dir, o.material.rough));
+            let srr = indirect_ray.get_color(s, i+1);
 
             (
-                srr.0 * o.material.rfness + o.material.color * (1.0 - o.material.rfness),
-                srr.1 * (0.5 + o.material.rfness * 0.5) + o.material.emit_color
+                srr.0 * o.material.reflective + o.material.color * (1.0 - o.material.reflective),
+                (srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35)) + o.material.emit_color) * ((15.0 - h.t) / 15.0).max(0.25).min(1.25)
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
             let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
             (
                 sc,
-                Vector3::new(0.5, 0.7, 1.0)
+                Vector3::new(0.5, 0.5, 0.4)
             )
+        }
+    }
+}
+
+fn generate_random_sphere() -> Vector3<f64> {
+    let mut rng = rand::thread_rng();
+    loop {
+        let p = Vector3::new(
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(-1.0..1.0),
+        );
+        if (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) < 1.0 {
+            return p;
         }
     }
 }
