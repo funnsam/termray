@@ -69,6 +69,23 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                 prep_exit()?;
                 std::process::exit(0);
             },
+            Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
+                use std::path::Path;
+                use std::fs::File;
+                use std::io::BufWriter;
+
+                let path = Path::new(r"image_out.png");
+                let file = File::create(path).unwrap();
+                let ref mut w = BufWriter::new(file);
+
+                let mut encoder = png::Encoder::new(w, 1024, 1024);
+                encoder.set_color(png::ColorType::Rgba);
+                encoder.set_depth(png::BitDepth::Eight);
+
+                let mut writer = encoder.write_header().unwrap();
+                let 
+            },
+
             Event::Key(KeyEvent { code: KeyCode::Char('a'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new( 0.25, 0.0, 0.0),
             Event::Key(KeyEvent { code: KeyCode::Char('d'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(-0.25, 0.0, 0.0),
             Event::Key(KeyEvent { code: KeyCode::Char('q'), .. }) => state.cam_pos += Rotation3::new(state.cam_dir) * Vector3::new(0.0,  0.25, 0.0), 
