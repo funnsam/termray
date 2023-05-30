@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         r: 200.0,
     };
     let s4 = Sphere {
-        c: Vector3::new(0.0, 5.0, 1.15),
+        c: Vector3::new(0.0, 1.0, 1.15),
         r: 0.5,
     };
 

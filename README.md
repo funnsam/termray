@@ -7,3 +7,5 @@ Raytracer written in Rust being displayed on the terminal
 ![Image 1](images/image_1.png)
 
 ![Image 2](images/image_2.png)
+
+![Image 3](images/image_3.png)

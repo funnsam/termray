@@ -1,4 +1,5 @@
 use nalgebra::base::*;
+use rayon::prelude::*;
 use rand::Rng;
 
 pub const LIGHT_BOUNCES : usize = 16;
@@ -29,7 +30,7 @@ pub struct Material {
     pub rough: f64
 }
 
-pub trait ObjectKind {
+pub trait ObjectKind: Sync + Send {
     fn try_ray(&self, ray: &Ray) -> HitInfo;
 }
 
@@ -64,8 +65,8 @@ pub fn rotate(p: Vector3<f64>, r: Vector2<f64>) -> Vector3<f64> {
 
 pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector3<f64>>>, passes_done: usize) -> Vec<Vec<(u8, u8, u8)>> {
     let scr_f = prev_img;
-    let mut scr_i = vec![vec![(0, 0, 0); size]; size];
-    for ay in 0..size {
+    let scr_i = vec![vec![(0, 0, 0); size]; size];
+    scr_f.into_par_iter().enumerate().for_each(|(ay, scr_f)| {
         for ax in 0..size {
             let x = (size - ax - 1) as f64;
             let y = (size - ay - 1) as f64;
@@ -93,11 +94,17 @@ pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector
 
             c /= (SAMPLES_LVL * SAMPLES_LVL) as f64;
 
-            scr_f[ay][ax] += c;
-            c = scr_f[ay][ax] / passes_done as f64;
+            scr_f[ax] += c;
+            c = scr_f[ax] / passes_done as f64;
+            
+            let scr_i = unsafe {
+                &mut *(&scr_i
+                    as *const Vec<Vec<(u8, u8, u8)>>
+                    as *mut Vec<Vec<(u8, u8, u8)>>)
+            };
             scr_i[ay][ax] = (map(c[0]), map(c[1]), map(c[2]));
         }
-    }
+    });
     scr_i
 }
 
@@ -175,7 +182,10 @@ impl Ray {
 
             (
                 srr.0 * o.material.reflective + o.material.color * (1.0 - o.material.reflective),
-                (srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35)) + o.material.emit_color) * ((15.0 - h.t) / 15.0).max(0.25).min(1.25)
+                (
+                    srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35))
+                    + o.material.emit_color
+                ) * (1.0 - (h.t / (h.t + 5.0)))
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
