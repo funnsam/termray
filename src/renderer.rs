@@ -6,6 +6,9 @@ pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
 pub const RNG_LIMIT     : usize = 256;
 
+pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
+// pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+
 #[derive(Default)]
 pub struct RendererState<'a> {
     pub cam_pos: Vector3<f64>,
@@ -192,11 +195,7 @@ impl Ray {
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
             let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
-            (
-                sc,
-                Vector3::default()
-                // Vector3::new(0.5, 0.5, 0.4)
-            )
+            (sc, SKY_LIGHT)
         }
     }
 }
