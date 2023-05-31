@@ -6,8 +6,8 @@ pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
 pub const RNG_LIMIT     : usize = 256;
 
-pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
-// pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+//pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
+pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
 
 #[derive(Default)]
 pub struct RendererState<'a> {
@@ -134,6 +134,31 @@ impl ObjectKind for Sphere {
             hi.t = (-b - d.sqrt()) / (2.0 * a);
             hi.p = r.at(hi.t);
             hi.n = (hi.p - self.c) / self.r;
+        }
+
+        hi
+    }
+}
+
+pub struct Triangle {
+    pub v: [Vector3<f64>; 3],
+}
+
+impl ObjectKind for Triangle {
+    fn try_ray(&self, r: &Ray) -> HitInfo {
+        let a = self.v[1] - self.v[0];
+        let b = self.v[2] - self.v[0];
+        let n = a.cross(&b).normalize();
+        let d = -n.dot(&self.v[0]);
+        let t = -((n.dot(&r.origin) + d) / n.dot(&r.direction));
+
+        let mut hi = HitInfo::default();
+        if t < 0.0 {
+            hi.t = -1.0;
+        } else {
+            hi.t = t;
+            hi.n = n;
+            hi.p = r.at(hi.t);
         }
 
         hi

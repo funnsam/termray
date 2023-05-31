@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let s = generate_balls();
     for (o, m) in s.iter() {
-        state.scene.push(Object::new(o, m));
+        state.scene.push(Object::new(&**o, m));
     }
 
     let mut fno = 1;
@@ -50,15 +50,31 @@ const COLORS: &[(u8, u8, u8)] = &[
     (0x27, 0x7D, 0xA1),
 ];
 
-fn generate_balls() -> Vec<(Sphere, Material)> {
-    let mut buf = Vec::with_capacity(BALLS_SQRT as usize * BALLS_SQRT as usize + 1);
-    buf.push((Sphere {
-        c: Vector3::new(0.0, -1000.0, 0.0),
-        r: 1000.0,
-    }, Material {
+fn generate_balls() -> Vec<(Box<dyn ObjectKind>, Material)> {
+    let mut buf: Vec<(Box<dyn ObjectKind>, Material)> = Vec::with_capacity(BALLS_SQRT as usize * BALLS_SQRT as usize + 2);
+    buf.push((Box::new(Triangle {
+        v: [
+            Vector3::new(1000.0, 0.0, 1000.0),
+            Vector3::new(0000.0, 0.0, 1000.0),
+            Vector3::new(1000.0, 0.0, 0000.0),
+        ]
+    }), Material {
         color: Vector3::new(0.3, 0.5, 1.0),
         emit_color: Vector3::default(),
-        reflective: 0.4,
+        reflective: 0.6,
+        rough: 0.75,
+    }));
+
+    buf.push((Box::new(Triangle {
+        v: [
+            Vector3::new(0000.0, 0.0, 0000.0),
+            Vector3::new(0000.0, 0.0, 1000.0),
+            Vector3::new(1000.0, 0.0, 0000.0),
+        ]
+    }), Material {
+        color: Vector3::new(0.3, 0.5, 1.0),
+        emit_color: Vector3::default(),
+        reflective: 0.6,
         rough: 0.75,
     }));
 
@@ -81,9 +97,9 @@ fn generate_balls() -> Vec<(Sphere, Material)> {
             );
             let emit_color = if rng.gen() { color * rng.gen_range(0.75..2.0) } else { Vector3::default() };
 
-            buf.push((Sphere {
+            buf.push((Box::new(Sphere {
                 c, r: 0.2
-            }, Material {
+            }), Material {
                 color, emit_color,
                 reflective: rng.gen_range(0.0..1.0),
                 rough: rng.gen_range(0.0..1.0),
