@@ -121,7 +121,7 @@ fn generate_balls() -> Vec<(Sphere, Material)> {
                 rng.gen_range(0.0..1.0),
                 rng.gen_range(0.0..1.0),
             );
-            let emit_color = if (color.sum() / 3.0) > 0.5 { color } else { Vector3::default() };
+            let emit_color = if (color.sum() / 3.0) > 0.75 { color } else { Vector3::default() };
 
             buf.push((Sphere {
                 c, r: 0.2

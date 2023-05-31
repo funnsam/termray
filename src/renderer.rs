@@ -187,7 +187,7 @@ impl Ray {
                 (
                     srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35))
                     + o.material.emit_color
-                ) * (1.0 - (h.t / (h.t + 15.0)))
+                ) * (1.0 - (h.t.abs() / (h.t.abs() + 15.0)))
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);

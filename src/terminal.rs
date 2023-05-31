@@ -4,8 +4,8 @@ use std::io::{stdout, Write};
 use std::time::Duration;
 use std::f64::consts::TAU;
 
-pub const SCREENSHOT_SIZE: usize = 1024;
-pub const SCREENSHOT_SAMPLES: usize = 16;
+pub const SCREENSHOT_SIZE: usize = 256;
+pub const SCREENSHOT_SAMPLES: usize = 4;
 
 pub fn init() -> core::result::Result<u16, Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
