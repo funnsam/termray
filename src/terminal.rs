@@ -5,7 +5,7 @@ use std::time::Duration;
 use std::f64::consts::TAU;
 
 pub const SCREENSHOT_SIZE: usize = 1000;
-pub const SCREENSHOT_SAMPLES: usize = 12;
+pub const SCREENSHOT_SAMPLES: usize = 1;
 
 pub fn init() -> core::result::Result<u16, Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
@@ -73,7 +73,7 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                 prep_exit()?;
                 std::process::exit(0);
             },
-            Event::Key(KeyEvent { code: KeyCode::F(12), .. }) => {
+            Event::Key(KeyEvent { code: KeyCode::F(12), kind: KeyEventKind::Press, .. }) => {
                 use std::path::Path;
                 use std::fs::File;
                 use std::io::BufWriter;

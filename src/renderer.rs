@@ -6,8 +6,8 @@ pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
 pub const RNG_LIMIT     : usize = 256;
 
-//pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
-pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
+//pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
 
 #[derive(Default)]
 pub struct RendererState<'a> {
@@ -30,11 +30,23 @@ impl<'a> Object<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct Material {
     pub color: Vector3<f64>,
     pub emit_color: Vector3<f64>,
     pub reflective: f64,
     pub rough: f64
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Material {
+            color: Vector3::new(0.5, 0.0, 0.0),
+            emit_color: Vector3::new(0.5, 0.5, 0.5),
+            reflective: 0.3,
+            rough: 0.7
+        }
+    }
 }
 
 pub trait ObjectKind: Sync + Send {
@@ -140,28 +152,68 @@ impl ObjectKind for Sphere {
     }
 }
 
+#[derive(Debug)]
 pub struct Triangle {
     pub v: [Vector3<f64>; 3],
 }
 
 impl ObjectKind for Triangle {
     fn try_ray(&self, r: &Ray) -> HitInfo {
+        let mut hi = HitInfo::default();
+
         let a = self.v[1] - self.v[0];
         let b = self.v[2] - self.v[0];
         let n = a.cross(&b).normalize();
         let d = -n.dot(&self.v[0]);
-        let t = -((n.dot(&r.origin) + d) / n.dot(&r.direction));
 
-        let mut hi = HitInfo::default();
-        if t < 0.0 {
+        if r.direction.dot(&n) > 0.0 {
             hi.t = -1.0;
         } else {
-            hi.t = t;
-            hi.n = n;
-            hi.p = r.at(hi.t);
+            let t = -((n.dot(&r.origin) + d) / n.dot(&r.direction));
+
+            if t < 0.0 {
+                hi.t = -1.0;
+            } else {
+                let p = r.at(t);
+
+                let e0 = a;
+                let e1 = self.v[2] - self.v[1];
+                let e2 = self.v[0] - self.v[2];
+                let c0 = p - self.v[0];
+                let c1 = p - self.v[1];
+                let c2 = p - self.v[2];
+                if  n.dot(&e0.cross(&c0)) > 0.0 &&
+                    n.dot(&e1.cross(&c1)) > 0.0 &&
+                    n.dot(&e2.cross(&c2)) > 0.0 {
+                    hi.t = t;
+                    hi.n = n;
+                    hi.p = p;
+                } else {
+                    hi.t = -1.0;
+                }
+            }
         }
 
         hi
+    }
+}
+
+pub struct Mesh {
+    pub ts: Vec<Triangle>
+}
+
+impl ObjectKind for Mesh {
+    fn try_ray(&self, r: &Ray) -> HitInfo {
+        let mut fhi = None;
+        let mut t = f64::INFINITY;
+        for i in self.ts.iter() {
+            let h = i.try_ray(r);
+            if h.t > 0.001 && h.t < t {
+                t = h.t;
+                fhi = Some(h)
+            }
+        }
+        fhi.unwrap_or(HitInfo { p: Vector3::default(), n: Vector3::default(), t: -1.0 })
     }
 }
 

@@ -12,3 +12,4 @@ nalgebra = "0.32.2"
 png = "0.17.8"
 rand = "0.8.5"
 rayon = "1.7.0"
+tobj = { version = "4.0.0", features = ["use_f64"], default-features = false }

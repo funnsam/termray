@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = renderer::RendererState::default();
     let mut img = vec![vec![Vector3::default(); size as usize]; size as usize];
     
-    let s = generate_balls();
+    let s = load_obj()?; // generate_balls();
     for (o, m) in s.iter() {
         state.scene.push(Object::new(&**o, m));
     }
@@ -50,33 +50,69 @@ const COLORS: &[(u8, u8, u8)] = &[
     (0x27, 0x7D, 0xA1),
 ];
 
+fn load_obj() -> Result<Vec<(Box<dyn ObjectKind>, Material)>, Box<dyn std::error::Error>> {
+    let obj = tobj::load_obj("model.obj", &tobj::GPU_LOAD_OPTIONS)?;
+    let (models, _materials) = obj;
+
+    let mut buf: Vec<(Box<dyn ObjectKind>, Material)> = Vec::with_capacity(models.len());
+
+    for i in models.iter() {
+        let mesh = &i.mesh;
+
+        let mut ts = Vec::with_capacity(mesh.positions.len() / 3);
+
+        for j in mesh.indices.chunks(3) {
+            let pos0 = Vector3::new(
+                mesh.positions[j[0] as usize * 3 + 0],
+                mesh.positions[j[0] as usize * 3 + 1],
+                mesh.positions[j[0] as usize * 3 + 2],
+            );
+            let pos1 = Vector3::new(
+                mesh.positions[j[1] as usize * 3 + 0],
+                mesh.positions[j[1] as usize * 3 + 1],
+                mesh.positions[j[1] as usize * 3 + 2],
+            );
+            let pos2 = Vector3::new(
+                mesh.positions[j[2] as usize * 3 + 0],
+                mesh.positions[j[2] as usize * 3 + 1],
+                mesh.positions[j[2] as usize * 3 + 2],
+            );
+
+            ts.push(Triangle { v: [pos0, pos1, pos2] })
+        }
+
+        buf.push((Box::new(Mesh { ts }), Material::default()))
+    }
+
+    Ok(buf)
+}
+
 fn generate_balls() -> Vec<(Box<dyn ObjectKind>, Material)> {
     let mut buf: Vec<(Box<dyn ObjectKind>, Material)> = Vec::with_capacity(BALLS_SQRT as usize * BALLS_SQRT as usize + 2);
-    buf.push((Box::new(Triangle {
-        v: [
-            Vector3::new(1000.0, 0.0, 1000.0),
-            Vector3::new(0000.0, 0.0, 1000.0),
-            Vector3::new(1000.0, 0.0, 0000.0),
-        ]
-    }), Material {
-        color: Vector3::new(0.3, 0.5, 1.0),
-        emit_color: Vector3::default(),
-        reflective: 0.6,
-        rough: 0.75,
-    }));
-
-    buf.push((Box::new(Triangle {
-        v: [
-            Vector3::new(0000.0, 0.0, 0000.0),
-            Vector3::new(0000.0, 0.0, 1000.0),
-            Vector3::new(1000.0, 0.0, 0000.0),
-        ]
-    }), Material {
-        color: Vector3::new(0.3, 0.5, 1.0),
-        emit_color: Vector3::default(),
-        reflective: 0.6,
-        rough: 0.75,
-    }));
+    buf.push((Box::new(
+        Mesh { ts: vec![
+            Triangle {
+                v: [
+                    Vector3::new(1000.0, 0.0, 1000.0),
+                    Vector3::new(0000.0, 0.0, 1000.0),
+                    Vector3::new(1000.0, 0.0, 0000.0),
+                ]
+            },
+            Triangle {
+                v: [
+                    Vector3::new(0000.0, 0.0, 0000.0),
+                    Vector3::new(0000.0, 0.0, 1000.0),
+                    Vector3::new(1000.0, 0.0, 0000.0),
+                ]
+            },
+        ]}),
+        Material {
+            color: Vector3::new(0.3, 0.5, 1.0),
+            emit_color: Vector3::default(),
+            reflective: 0.4,
+            rough: 0.75,
+        }
+    ));
 
     use rand::Rng;
     let mut rng = rand::thread_rng();
@@ -84,9 +120,9 @@ fn generate_balls() -> Vec<(Box<dyn ObjectKind>, Material)> {
     for x in -BALLS_SQRT/2..BALLS_SQRT/2 {
         for z in -BALLS_SQRT/2..BALLS_SQRT/2 {
             let c = Vector3::new(
-                rng.gen_range(0.0..0.9) + x as f64,
+                rng.gen_range(0.0..0.8) + x as f64,
                 0.2,
-                rng.gen_range(0.0..0.9) + z as f64,
+                rng.gen_range(0.0..0.8) + z as f64,
             );
 
             let color = COLORS[rng.gen_range(0..COLORS.len())];
@@ -95,7 +131,7 @@ fn generate_balls() -> Vec<(Box<dyn ObjectKind>, Material)> {
                 color.1 as f64 / 255.0,
                 color.2 as f64 / 255.0,
             );
-            let emit_color = if rng.gen() { color * rng.gen_range(0.75..2.0) } else { Vector3::default() };
+            let emit_color = if rng.gen() { color * rng.gen_range(1.0..2.5) } else { Vector3::default() };
 
             buf.push((Box::new(Sphere {
                 c, r: 0.2

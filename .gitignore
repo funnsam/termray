@@ -1,3 +1,7 @@
 /target
 /Cargo.lock
 /image_out.png
+*.blend
+*.blend1
+*.mtl
+*.obj
