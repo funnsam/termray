@@ -1,10 +1,11 @@
-use nalgebra::{base::*, geometry::*};
+use nalgebra::base::*;
 use crossterm::{*, style::{Color, Stylize}, event::*};
 use std::io::{stdout, Write};
 use std::time::Duration;
 use std::f64::consts::TAU;
 
-pub const SCREENSHOT_SIZE: usize = 2048;
+pub const SCREENSHOT_SIZE: usize = 1024;
+pub const SCREENSHOT_SAMPLES: usize = 16;
 
 pub fn init() -> core::result::Result<u16, Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
@@ -99,7 +100,7 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                 let mut buf = Vec::with_capacity(SCREENSHOT_SIZE * SCREENSHOT_SIZE * 3);
 
                 let mut img = vec![vec![Vector3::default(); SCREENSHOT_SIZE]; SCREENSHOT_SIZE];
-                for i in 0..8 {
+                for i in 0..SCREENSHOT_SAMPLES {
                     crate::renderer::render(state, SCREENSHOT_SIZE, &mut img, i);
                 }
                 let img = crate::renderer::render(state, SCREENSHOT_SIZE, &mut img, 8+1);
@@ -125,6 +126,19 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
             Event::Key(KeyEvent { code: KeyCode::Up   , kind: KeyEventKind::Press, .. }) => state.rot[0] -= 1.0 / 8.0 * TAU, 
             Event::Key(KeyEvent { code: KeyCode::Right, kind: KeyEventKind::Press, .. }) => state.rot[1] += 1.0 / 8.0 * TAU, 
             Event::Key(KeyEvent { code: KeyCode::Left , kind: KeyEventKind::Press, .. }) => state.rot[1] -= 1.0 / 8.0 * TAU, 
+
+            Event::Key(KeyEvent { code: KeyCode::Home, kind: KeyEventKind::Press, .. }) => state.focus += 0.25,
+            Event::Key(KeyEvent { code: KeyCode::End , kind: KeyEventKind::Press, .. }) => state.focus -= 0.25,
+            Event::Key(KeyEvent { code: KeyCode::Backspace, kind: KeyEventKind::Press, .. }) => {
+                let r = crate::renderer::Ray::new(state.cam_pos, crate::renderer::rotate(Vector3::z(), state.rot));
+                let h = r.try_hit(&state.scene);
+                if h.is_some() {
+                    let (h, _) = h.unwrap();
+                    state.focus = h.t
+                }
+            },
+            Event::Key(KeyEvent { code: KeyCode::PageUp  , kind: KeyEventKind::Press, .. }) => state.aperture += 0.25,
+            Event::Key(KeyEvent { code: KeyCode::PageDown, kind: KeyEventKind::Press, .. }) => state.aperture -= 0.25,
             _ => ()
         }
     }

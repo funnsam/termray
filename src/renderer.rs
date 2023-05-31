@@ -3,13 +3,16 @@ use rayon::prelude::*;
 use rand::Rng;
 
 pub const LIGHT_BOUNCES : usize = 16;
-pub const SAMPLES_LVL   : usize = 4;
+pub const SAMPLES_LVL   : usize = 16;
 
 #[derive(Default)]
 pub struct RendererState<'a> {
     pub cam_pos: Vector3<f64>,
     pub rot: Vector2<f64>,
-    pub scene: Vec<Object<'a>>
+    pub scene: Vec<Object<'a>>,
+
+    pub focus: f64,
+    pub aperture: f64
 }
 
 pub struct Object<'a> {
@@ -73,26 +76,25 @@ pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector
 
             let mut c = Vector3::default();
 
-            for ix in 0..SAMPLES_LVL {
-                for iy in 0..SAMPLES_LVL {
-                    let offx = (ix as f64 / SAMPLES_LVL as f64) - 0.5;
-                    let offy = (iy as f64 / SAMPLES_LVL as f64) - 0.5;
-                    let px = (x + offx) / size as f64 * 2.0 - 1.0;
-                    let py = (y + offy) / size as f64 * 2.0 - 1.0;
+            for _ in 0..SAMPLES_LVL {
+                let px = x / size as f64 * 2.0 - 1.0;
+                let py = y / size as f64 * 2.0 - 1.0;
 
-                    let ray_pos = rs.cam_pos;
-                    let ray_dir = rotate(Vector3::new(px, py, 1.0).normalize(), rs.rot);
+                let ray_pos = rs.cam_pos + generate_random_circle() * (0.05 * rs.aperture);
 
-                    let ray = Ray::new(ray_pos, ray_dir);
+                let ray_tar = Vector3::new(px, py, 1.0) * rs.focus.max(0.01) - ray_pos;
 
-                    let r = ray.get_color(&rs.scene, 0);
-                    c[0] += r.0[0] * r.1[0];
-                    c[1] += r.0[1] * r.1[1];
-                    c[2] += r.0[2] * r.1[2];
-                }
+                let ray_dir = rotate((ray_tar + rs.cam_pos).normalize(), rs.rot);
+
+                let ray = Ray::new(ray_pos, ray_dir);
+
+                let r = ray.get_color(&rs.scene, 0);
+                c[0] += r.0[0] * r.1[0];
+                c[1] += r.0[1] * r.1[1];
+                c[2] += r.0[2] * r.1[2];
             }
 
-            c /= (SAMPLES_LVL * SAMPLES_LVL) as f64;
+            c /= (SAMPLES_LVL) as f64;
 
             scr_f[ax] += c;
             c = scr_f[ax] / passes_done as f64;
@@ -150,7 +152,7 @@ impl Ray {
         self.origin + self.direction * t
     }
 
-    fn try_hit<'a>(&self, scene: &'a Vec<Object<'a>>) -> Option<(HitInfo, &'a Object<'a>)> {
+    pub fn try_hit<'a>(&self, scene: &'a Vec<Object<'a>>) -> Option<(HitInfo, &'a Object<'a>)> {
         let mut r = None;
         let mut t = f64::INFINITY;
         for i in scene {
@@ -185,7 +187,7 @@ impl Ray {
                 (
                     srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35))
                     + o.material.emit_color
-                ) * (1.0 - (h.t / (h.t + 5.0)))
+                ) * (1.0 - (h.t / (h.t + 15.0)))
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
@@ -207,6 +209,20 @@ fn generate_random_sphere() -> Vector3<f64> {
             rng.gen_range(-1.0..1.0),
         );
         if (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) < 1.0 {
+            return p;
+        }
+    }
+}
+
+fn generate_random_circle() -> Vector3<f64> {
+    let mut rng = rand::thread_rng();
+    loop {
+        let p = Vector3::new(
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(-1.0..1.0),
+            0.0,
+        );
+        if (p[0] * p[0] + p[1] * p[1]) < 1.0 {
             return p;
         }
     }
