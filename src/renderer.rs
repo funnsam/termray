@@ -94,7 +94,7 @@ pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector
                 c[2] += r.0[2] * r.1[2];
             }
 
-            c /= (SAMPLES_LVL) as f64;
+            c /= SAMPLES_LVL as f64;
 
             scr_f[ax] += c;
             c = scr_f[ax] / passes_done as f64;
@@ -157,7 +157,7 @@ impl Ray {
         let mut t = f64::INFINITY;
         for i in scene {
             let h = i.kind.try_ray(self);
-            if h.t > 0.0 && h.t < t {
+            if h.t > 0.001 && h.t < t {
                 t = h.t;
                 r = Some((h, i))
             }
@@ -177,17 +177,18 @@ impl Ray {
         if h.is_some() {
             let (h, o) = h.unwrap();
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
-            let diffuse_dir  = h.p + h.n + generate_random_sphere().normalize();
+            let diffuse_dir  = h.n + generate_random_sphere().normalize();
 
             let indirect_ray = Ray::new(h.p, specular_dir.lerp(&diffuse_dir, o.material.rough));
             let srr = indirect_ray.get_color(s, i+1);
 
             (
-                srr.0 * o.material.reflective + o.material.color * (1.0 - o.material.reflective),
+                srr.0 * o.material.reflective
+                + o.material.color * (1.0 - o.material.reflective),
                 (
                     srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35))
                     + o.material.emit_color
-                ) * (1.0 - (h.t.abs() / (h.t.abs() + 15.0)))
+                ) * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)))
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);

@@ -87,6 +87,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+// https://coolors.co/palette/f94144-f3722c-f8961e-f9844a-f9c74f-90be6d-43aa8b-4d908e-577590-277da1
+const COLORS: &[(u8, u8, u8)] = &[
+    (0xF9, 0x41, 0x44),
+    (0xF3, 0x72, 0x2C),
+    (0xF8, 0x96, 0x1E),
+    (0xF9, 0x84, 0x4A),
+    (0xF9, 0xC7, 0x4F),
+    (0x90, 0xBE, 0x6D),
+    (0x43, 0xAA, 0x8B),
+    (0x4D, 0x90, 0x8E),
+    (0x57, 0x75, 0x90),
+    (0x27, 0x7D, 0xA1),
+];
+
 fn generate_balls() -> Vec<(Sphere, Material)> {
     fn len(v: Vector3<f64>) -> f64 {
         (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
@@ -116,12 +130,13 @@ fn generate_balls() -> Vec<(Sphere, Material)> {
 
             if len(c - Vector3::new(4.0, 0.2, 0.0)) <= 0.9 { continue; }
 
+            let color = COLORS[rng.gen_range(0..COLORS.len())];
             let color = Vector3::new(
-                rng.gen_range(0.0..1.0),
-                rng.gen_range(0.0..1.0),
-                rng.gen_range(0.0..1.0),
+                color.0 as f64 / 255.0,
+                color.1 as f64 / 255.0,
+                color.2 as f64 / 255.0,
             );
-            let emit_color = if (color.sum() / 3.0) > 0.75 { color } else { Vector3::default() };
+            let emit_color = if rng.gen() { color * 2.0 } else { Vector3::default() };
 
             buf.push((Sphere {
                 c, r: 0.2
