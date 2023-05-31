@@ -4,6 +4,7 @@ use rand::Rng;
 
 pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
+pub const RNG_LIMIT     : usize = 256;
 
 #[derive(Default)]
 pub struct RendererState<'a> {
@@ -82,16 +83,14 @@ pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector
 
                 let ray_pos = rs.cam_pos + generate_random_circle() * (0.05 * rs.aperture);
 
-                let ray_tar = Vector3::new(px, py, 1.0) * rs.focus.max(0.01) - ray_pos;
+                let ray_tar = Vector3::new(px, py, 1.0) * rs.focus.max(0.05) - ray_pos;
 
                 let ray_dir = rotate((ray_tar + rs.cam_pos).normalize(), rs.rot);
 
                 let ray = Ray::new(ray_pos, ray_dir);
 
                 let r = ray.get_color(&rs.scene, 0);
-                c[0] += r.0[0] * r.1[0];
-                c[1] += r.0[1] * r.1[1];
-                c[2] += r.0[2] * r.1[2];
+                c += apply_light(r.0, r.1);
             }
 
             c /= SAMPLES_LVL as f64;
@@ -195,7 +194,8 @@ impl Ray {
             let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
             (
                 sc,
-                Vector3::new(0.5, 0.5, 0.4)
+                Vector3::default()
+                // Vector3::new(0.5, 0.5, 0.4)
             )
         }
     }
@@ -203,7 +203,7 @@ impl Ray {
 
 fn generate_random_sphere() -> Vector3<f64> {
     let mut rng = rand::thread_rng();
-    loop {
+    for _ in 0..RNG_LIMIT {
         let p = Vector3::new(
             rng.gen_range(-1.0..1.0),
             rng.gen_range(-1.0..1.0),
@@ -213,11 +213,12 @@ fn generate_random_sphere() -> Vector3<f64> {
             return p;
         }
     }
+    Vector3::default()
 }
 
 fn generate_random_circle() -> Vector3<f64> {
     let mut rng = rand::thread_rng();
-    loop {
+    for _ in 0..RNG_LIMIT {
         let p = Vector3::new(
             rng.gen_range(-1.0..1.0),
             rng.gen_range(-1.0..1.0),
@@ -227,4 +228,13 @@ fn generate_random_circle() -> Vector3<f64> {
             return p;
         }
     }
+    Vector3::default()
+}
+
+fn apply_light(c: Vector3<f64>, l: Vector3<f64>) -> Vector3<f64> {
+    let mut o = Vector3::default();
+    o[0] = c[0] * l[0];
+    o[1] = c[1] * l[1];
+    o[2] = c[2] * l[2];
+    o
 }

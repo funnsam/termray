@@ -12,58 +12,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut state = renderer::RendererState::default();
     let mut img = vec![vec![Vector3::default(); size as usize]; size as usize];
     
-    /*let m1 = Material {
-        color: Vector3::new(0.5, 0.0, 0.0),
-        emit_color: Vector3::default(),
-        reflective: 0.7,
-        rough: 0.5,
-    };
-    let m2 = Material {
-        color: Vector3::new(0.0, 0.5, 0.0),
-        emit_color: Vector3::default(),
-        reflective: 0.7,
-        rough: 0.0,
-    };
-    let m3 = Material {
-        color: Vector3::new(0.3, 0.5, 1.0),
-        emit_color: Vector3::default(),
-        reflective: 0.4,
-        rough: 0.75,
-    };
-    let m4 = Material {
-        color: Vector3::new(1.0, 1.0, 1.0),
-        emit_color: Vector3::new(2.0, 2.0, 2.0),
-        reflective: 0.0,
-        rough: 0.0,
-    };
-
-    let s1 = Sphere {
-        c: Vector3::new(-0.6, 0.0, 1.0),
-        r: 0.5,
-    };
-    let s2 = Sphere {
-        c: Vector3::new(0.6, 0.0, 1.0),
-        r: 0.5,
-    };
-    let s3 = Sphere {
-        c: Vector3::new(0.0, -201.0, 0.0),
-        r: 200.0,
-    };
-    let s4 = Sphere {
-        c: Vector3::new(0.0, 1.0, 1.15),
-        r: 0.5,
-    };
-
-    let o1 = Object::new(&s1, &m1);
-    let o2 = Object::new(&s2, &m2);
-    let o3 = Object::new(&s3, &m3);
-    let o4 = Object::new(&s4, &m4);
-
-    state.scene.push(o1);
-    state.scene.push(o2);
-    state.scene.push(o3);
-    state.scene.push(o4);*/
-
     let s = generate_balls();
     for (o, m) in s.iter() {
         state.scene.push(Object::new(o, m));
@@ -87,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+const BALLS_SQRT: i32 = 10;
 // https://coolors.co/palette/f94144-f3722c-f8961e-f9844a-f9c74f-90be6d-43aa8b-4d908e-577590-277da1
 const COLORS: &[(u8, u8, u8)] = &[
     (0xF9, 0x41, 0x44),
@@ -102,11 +51,7 @@ const COLORS: &[(u8, u8, u8)] = &[
 ];
 
 fn generate_balls() -> Vec<(Sphere, Material)> {
-    fn len(v: Vector3<f64>) -> f64 {
-        (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
-    }
-
-    let mut buf = Vec::with_capacity(101);
+    let mut buf = Vec::with_capacity(BALLS_SQRT as usize * BALLS_SQRT as usize + 1);
     buf.push((Sphere {
         c: Vector3::new(0.0, -1000.0, 0.0),
         r: 1000.0,
@@ -120,15 +65,13 @@ fn generate_balls() -> Vec<(Sphere, Material)> {
     use rand::Rng;
     let mut rng = rand::thread_rng();
 
-    for x in -5..5 {
-        for z in -5..5 {
+    for x in -BALLS_SQRT/2..BALLS_SQRT/2 {
+        for z in -BALLS_SQRT/2..BALLS_SQRT/2 {
             let c = Vector3::new(
                 rng.gen_range(0.0..0.9) + x as f64,
                 0.2,
                 rng.gen_range(0.0..0.9) + z as f64,
             );
-
-            if len(c - Vector3::new(4.0, 0.2, 0.0)) <= 0.9 { continue; }
 
             let color = COLORS[rng.gen_range(0..COLORS.len())];
             let color = Vector3::new(
