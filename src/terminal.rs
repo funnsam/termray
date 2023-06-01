@@ -1,11 +1,20 @@
 use nalgebra::base::*;
 use crossterm::{*, style::{Color, Stylize}, event::*};
 use std::io::{stdout, Write};
-use std::time::Duration;
+use std::time::*;
 use std::f64::consts::TAU;
 
 pub const SCREENSHOT_SIZE: usize = 1000;
-pub const SCREENSHOT_SAMPLES: usize = 1;
+pub const SCREENSHOT_SAMPLES: usize = 12;
+
+pub static mut LOGS: Vec<(SystemTime, String)> = Vec::new();
+
+pub fn push_log(s: &str) {
+    unsafe {
+        let t = SystemTime::now();
+        LOGS.push((t, s.to_string()));
+    }
+}
 
 pub fn init() -> core::result::Result<u16, Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
@@ -70,6 +79,16 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
     if pr {
         match read()? {
             Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
+                unsafe {
+                    let mut s = String::new();
+
+                    for i in &LOGS {
+                        s += &format!("{:.02}s ago: {}\n", i.0.elapsed()?.as_secs_f64(), i.1);
+                    }
+
+                    std::fs::write("logs.txt", s)?;
+                }
+
                 prep_exit()?;
                 std::process::exit(0);
             },
@@ -80,6 +99,7 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
 
                 let mut so = stdout();
                 show(&mut so, "Rendering...")?;
+                push_log("Start render");
 
                 let path = Path::new(r"image_out.png");
                 let file = File::create(path)?;
@@ -108,6 +128,7 @@ pub fn handle_input(state: &mut crate::renderer::RendererState, el: Duration) ->
                     }
                 }
                 writer.write_image_data(&buf)?;
+                push_log("End render");
             },
   
             Event::Key(KeyEvent { code: KeyCode::Char('a'), kind: KeyEventKind::Press, .. }) => state.cam_pos += crate::renderer::rotate(Vector3::x() *  0.1225, state.rot),

@@ -6,8 +6,8 @@ pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
 pub const RNG_LIMIT     : usize = 256;
 
-pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.5, 0.5, 0.4);
-//pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+// pub const SKY_LIGHT: Vector3<f64> = Vector3::new(1.0, 1.0, 0.8);
+pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
 
 #[derive(Default)]
 pub struct RendererState<'a> {
@@ -34,7 +34,7 @@ impl<'a> Object<'a> {
 pub struct Material {
     pub color: Vector3<f64>,
     pub emit_color: Vector3<f64>,
-    pub reflective: f64,
+    pub shininess: f64,
     pub rough: f64
 }
 
@@ -42,8 +42,8 @@ impl Default for Material {
     fn default() -> Self {
         Material {
             color: Vector3::new(0.5, 0.0, 0.0),
-            emit_color: Vector3::new(0.5, 0.5, 0.5),
-            reflective: 0.3,
+            emit_color: Vector3::default(),
+            shininess: 0.3,
             rough: 0.7
         }
     }
@@ -53,11 +53,17 @@ pub trait ObjectKind: Sync + Send {
     fn try_ray(&self, ray: &Ray) -> HitInfo;
 }
 
-#[derive(Default)]
+// #[derive(Default)]
 pub struct HitInfo {
     pub p: Vector3<f64>,
     pub n: Vector3<f64>,
     pub t: f64,
+}
+
+impl Default for HitInfo {
+    fn default() -> Self {
+        Self { p: Vector3::default(), n: Vector3::default(), t: -1.0 }
+    }
 }
 
 pub fn rotate(p: Vector3<f64>, r: Vector2<f64>) -> Vector3<f64> {
@@ -161,38 +167,28 @@ impl ObjectKind for Triangle {
     fn try_ray(&self, r: &Ray) -> HitInfo {
         let mut hi = HitInfo::default();
 
-        let a = self.v[1] - self.v[0];
-        let b = self.v[2] - self.v[0];
-        let n = a.cross(&b).normalize();
-        let d = -n.dot(&self.v[0]);
+        let v0v1 = self.v[1] - self.v[0];
+        let v0v2 = self.v[2] - self.v[0];
+        let pvec = r.direction.cross(&v0v2);
+        let det = v0v1.dot(&pvec);
 
-        if r.direction.dot(&n) > 0.0 {
-            hi.t = -1.0;
-        } else {
-            let t = -((n.dot(&r.origin) + d) / n.dot(&r.direction));
+        if det < 0.0 { return hi }
 
-            if t < 0.0 {
-                hi.t = -1.0;
-            } else {
-                let p = r.at(t);
+        let inv_det = 1.0 / det;
 
-                let e0 = a;
-                let e1 = self.v[2] - self.v[1];
-                let e2 = self.v[0] - self.v[2];
-                let c0 = p - self.v[0];
-                let c1 = p - self.v[1];
-                let c2 = p - self.v[2];
-                if  n.dot(&e0.cross(&c0)) > 0.0 &&
-                    n.dot(&e1.cross(&c1)) > 0.0 &&
-                    n.dot(&e2.cross(&c2)) > 0.0 {
-                    hi.t = t;
-                    hi.n = n;
-                    hi.p = p;
-                } else {
-                    hi.t = -1.0;
-                }
-            }
-        }
+        let tvec = r.origin - self.v[0];
+        let u = tvec.dot(&pvec) * inv_det;
+        if u < 0.0 || u > 1.0 { return hi }
+
+        let qvec = tvec.cross(&v0v1);
+        let v = r.direction.dot(&qvec) * inv_det;
+        if v < 0.0 || u+v > 1.0 { return hi }
+
+        let t = v0v2.dot(&qvec) * inv_det;
+        
+        hi.t = t;
+        hi.p = r.at(t);
+        hi.n = v0v1.cross(&v0v2).normalize();
 
         hi
     }
@@ -262,17 +258,17 @@ impl Ray {
             let srr = indirect_ray.get_color(s, i+1);
 
             (
-                srr.0 * o.material.reflective
-                + o.material.color * (1.0 - o.material.reflective),
+                srr.0 * o.material.shininess
+                + o.material.color * (1.0 - o.material.shininess),
                 (
-                    srr.1 * (0.35 + o.material.reflective * (1.0 - 0.35))
+                    srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35))
                     + o.material.emit_color
                 ) * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)))
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
             let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
-            (sc, SKY_LIGHT)
+            (sc, SKY_LIGHT * (t + 0.5))
         }
     }
 }
