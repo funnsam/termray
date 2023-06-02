@@ -160,15 +160,16 @@ impl ObjectKind for Sphere {
 
 #[derive(Debug)]
 pub struct Triangle {
-    pub v: [Vector3<f64>; 3],
+    pub vp: [Vector3<f64>; 3],
+    pub vn: Option<[Vector3<f64>; 3]>,
 }
 
 impl ObjectKind for Triangle {
     fn try_ray(&self, r: &Ray) -> HitInfo {
         let mut hi = HitInfo::default();
 
-        let v0v1 = self.v[1] - self.v[0];
-        let v0v2 = self.v[2] - self.v[0];
+        let v0v1 = self.vp[1] - self.vp[0];
+        let v0v2 = self.vp[2] - self.vp[0];
         let pvec = r.direction.cross(&v0v2);
         let det = v0v1.dot(&pvec);
 
@@ -176,7 +177,7 @@ impl ObjectKind for Triangle {
 
         let inv_det = 1.0 / det;
 
-        let tvec = r.origin - self.v[0];
+        let tvec = r.origin - self.vp[0];
         let u = tvec.dot(&pvec) * inv_det;
         if u < 0.0 || u > 1.0 { return hi }
 
@@ -188,7 +189,10 @@ impl ObjectKind for Triangle {
         
         hi.t = t;
         hi.p = r.at(t);
-        hi.n = v0v1.cross(&v0v2).normalize();
+        hi.n = match self.vn {
+            Some(vn) => (1.0-u-v) * vn[0] + u * vn[1] + v * vn[2],
+            None => v0v1.cross(&v0v2).normalize(),
+        };
 
         hi
     }

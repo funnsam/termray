@@ -45,18 +45,20 @@ fn generate_floor() -> (Mesh, Material) {
     (
         Mesh { ts: vec![
             Triangle {
-                v: [
+                vp: [
                     Vector3::new(-1000.0, FLOOR_HEIGHT,  1000.0),
                     Vector3::new( 1000.0, FLOOR_HEIGHT,  1000.0),
                     Vector3::new( 1000.0, FLOOR_HEIGHT, -1000.0),
-                ]
+                ],
+                vn: None
             },
             Triangle {
-                v: [
+                vp: [
                     Vector3::new(-1000.0, FLOOR_HEIGHT,  1000.0),
                     Vector3::new( 1000.0, FLOOR_HEIGHT, -1000.0),
                     Vector3::new(-1000.0, FLOOR_HEIGHT, -1000.0),
-                ]
+                ],
+                vn: None
             },
         ]},
         Material {
@@ -84,23 +86,26 @@ fn load_obj() -> Result<Vec<(Box<dyn ObjectKind>, Material)>, Box<dyn std::error
         let mut ts = Vec::with_capacity(mesh.positions.len() / 3);
 
         for j in mesh.indices.chunks(3) {
-            let pos0 = Vector3::new(
-                mesh.positions[j[0] as usize * 3 + 0],
-                mesh.positions[j[0] as usize * 3 + 1],
-                mesh.positions[j[0] as usize * 3 + 2],
-            );
-            let pos1 = Vector3::new(
-                mesh.positions[j[1] as usize * 3 + 0],
-                mesh.positions[j[1] as usize * 3 + 1],
-                mesh.positions[j[1] as usize * 3 + 2],
-            );
-            let pos2 = Vector3::new(
-                mesh.positions[j[2] as usize * 3 + 0],
-                mesh.positions[j[2] as usize * 3 + 1],
-                mesh.positions[j[2] as usize * 3 + 2],
-            );
+            fn load(a: &Vec<f64>, j: &[u32], i: usize) -> Vector3<f64> {
+                Vector3::new(
+                    a[j[i] as usize * 3 + 0],
+                    a[j[i] as usize * 3 + 1],
+                    a[j[i] as usize * 3 + 2],
+                )
+            }
 
-            ts.push(Triangle { v: [pos0*OBJ_SCALE+OBJ_OFFSET, pos1*OBJ_SCALE+OBJ_OFFSET, pos2*OBJ_SCALE+OBJ_OFFSET] })
+            let p0 = load(&mesh.positions, &j, 0);
+            let p1 = load(&mesh.positions, &j, 1);
+            let p2 = load(&mesh.positions, &j, 2);
+
+            let n0 = load(&mesh.normals, &j, 0);
+            let n1 = load(&mesh.normals, &j, 1);
+            let n2 = load(&mesh.normals, &j, 2);
+
+            ts.push(Triangle {
+                vp: [p0*OBJ_SCALE+OBJ_OFFSET, p1*OBJ_SCALE+OBJ_OFFSET, p2*OBJ_SCALE+OBJ_OFFSET],
+                vn: Some([n0, n1, n2])
+            })
         }
 
         let mat = match mesh.material_id {
