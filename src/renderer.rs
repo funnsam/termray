@@ -110,8 +110,8 @@ pub fn render(rs: &mut RendererState, size: usize, prev_img: &mut Vec<Vec<Vector
 
                 let ray = Ray::new(ray_pos, ray_dir);
 
-                let r = ray.get_color(&rs.scene, 0);
-                c += apply_light(r.0, r.1);
+                let r = ray.get_color(&rs.scene, 0, Vector3::new(1.0, 1.0, 1.0));
+                c += apply_light(r.0, r.1) * (1.0 / r.2);
             }
 
             c /= SAMPLES_LVL as f64;
@@ -244,35 +244,49 @@ impl Ray {
         r
     }
 
-    pub fn get_color<'a>(&self, s: &Vec<Object<'a>>, i: usize) -> (Vector3<f64>, Vector3<f64>) {
+    pub fn get_color<'a>(&self, s: &Vec<Object<'a>>, i: usize, tp: Vector3<f64>) -> (Vector3<f64>, Vector3<f64>, f64) {
         if i == LIGHT_BOUNCES {
             return (
                 Vector3::default(),
-                Vector3::default()
+                Vector3::default(),
+                1.0
             )
         }
 
         let h = self.try_hit(s);
         if h.is_some() {
             let (h, o) = h.unwrap();
+
+            let p = tp.x.max(tp.y.max(tp.z));
+            if i != 0 {
+                let c = o.material.color * (1.0 - o.material.shininess);
+                let l = o.material.emit_color * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)));
+                let rn = rand::thread_rng().gen_range(0.0..1.0);
+                if rn > p {
+                    return (c, l, p)
+                }
+            }
+
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
             let diffuse_dir  = h.n + generate_random_sphere().normalize();
 
             let indirect_ray = Ray::new(h.p, specular_dir.lerp(&diffuse_dir, o.material.rough));
-            let srr = indirect_ray.get_color(s, i+1);
+            let srr = indirect_ray.get_color(s, i+1, tp * (1.0 - o.material.shininess * 0.5) * 1.0 / p);
+
+            let c = srr.0 * o.material.shininess + o.material.color * (1.0 - o.material.shininess);
+            let l = (
+                srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35))
+                + o.material.emit_color
+            ) * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)));
+
 
             (
-                srr.0 * o.material.shininess
-                + o.material.color * (1.0 - o.material.shininess),
-                (
-                    srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35))
-                    + o.material.emit_color
-                ) * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)))
+                c, l, 1.0
             )
         } else {
             let t = 0.5 * (self.direction[1] + 1.0);
             let sc = (1.0 - t) * Vector3::new(1.0, 1.0, 1.0) + t * Vector3::new(0.5, 0.7, 1.0);
-            (sc, SKY_LIGHT * (t + 0.5))
+            (sc, SKY_LIGHT * (t + 0.5), 1.0)
         }
     }
 }
