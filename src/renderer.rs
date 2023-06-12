@@ -285,7 +285,8 @@ impl Ray {
             let nee_l = if nee.is_some() {
                 let (h, o) = nee.unwrap();
                 o.material.emit_color * (1.0 - (h.t.abs() / (h.t.abs() + 100.0))) * 0.25
-            } else { Vector3::default() } + Vector3::new(1.0, 1.0, 1.0);
+            } else { Vector3::new(1.0, 1.0, 1.0) };
+            let nee_lc = Vector3::new(1.0, 1.0, 1.0).lerp(&nee_l, o.material.shininess);
 
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
             let diffuse_dir  = h.n + generate_random_sphere().normalize();
@@ -295,7 +296,7 @@ impl Ray {
 
             let c = srr.0 * o.material.shininess + o.material.color * (1.0 - o.material.shininess);
             let mut l = srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35)) + o.material.emit_color;
-            let lm = nee_l * (1.0 - (h.t.abs() / (h.t.abs() + 100.0))) * 0.75;
+            let lm = nee_lc * (1.0 - (h.t.abs() / (h.t.abs() + 100.0))) * 0.75;
 
             l.x *= lm.x;
             l.y *= lm.y;
