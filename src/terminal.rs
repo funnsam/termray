@@ -4,8 +4,8 @@ use std::io::{stdout, Write};
 use std::time::*;
 use std::f64::consts::TAU;
 
-pub const SCREENSHOT_SIZE: usize = 256;
-pub const SCREENSHOT_SAMPLES: usize = 4;
+pub const SCREENSHOT_SIZE: usize = 512;
+pub const SCREENSHOT_SAMPLES: usize = 8;
 
 pub static mut LOGS: Vec<(SystemTime, String)> = Vec::new();
 

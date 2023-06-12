@@ -1,3 +1,5 @@
+#![allow(cast_ref_to_mut)]
+
 use std::time::SystemTime;
 
 mod terminal;
@@ -156,9 +158,11 @@ fn generate_balls() -> Vec<(Box<dyn ObjectKind>, Material)> {
 
     for x in -BALLS_SQRT/2..BALLS_SQRT/2 {
         for z in -BALLS_SQRT/2..BALLS_SQRT/2 {
+            let y = rng.gen_range(0.0..500.0);
+            let y = (1.0 - y / (y + 100.0)) * 5.0 + 0.2;
             let c = Vector3::new(
                 rng.gen_range(0.0..0.8) + x as f64,
-                rng.gen_range(0.2..2.5),
+                y,
                 rng.gen_range(0.0..0.8) + z as f64,
             );
 

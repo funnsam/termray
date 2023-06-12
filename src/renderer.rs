@@ -1,13 +1,13 @@
 use nalgebra::base::*;
 use rayon::prelude::*;
-use rand::Rng;
+use rand::{Rng, rngs::ThreadRng};
 
 pub const LIGHT_BOUNCES : usize = 16;
 pub const SAMPLES_LVL   : usize = 16;
 pub const RNG_LIMIT     : usize = 256;
 
-// pub const SKY_LIGHT: Vector3<f64> = Vector3::new(1.0, 1.0, 0.8);
-pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
+pub const SKY_LIGHT: Vector3<f64> = Vector3::new(1.0, 1.0, 0.8);
+//pub const SKY_LIGHT: Vector3<f64> = Vector3::new(0.0, 0.0, 0.0);
 
 #[derive(Default)]
 pub struct RendererState<'a> {
@@ -51,6 +51,7 @@ impl Default for Material {
 
 pub trait ObjectKind: Sync + Send {
     fn try_ray(&self, ray: &Ray) -> HitInfo;
+    fn get_random_point(&self, rng: &mut ThreadRng) -> Vector3<f64>;
 }
 
 // #[derive(Default)]
@@ -62,7 +63,7 @@ pub struct HitInfo {
 
 impl Default for HitInfo {
     fn default() -> Self {
-        Self { p: Vector3::default(), n: Vector3::default(), t: -1.0 }
+        Self { p: Vector3::default(), n: Vector3::default(), t: -0.001 }
     }
 }
 
@@ -146,15 +147,16 @@ impl ObjectKind for Sphere {
         let d = b * b - 4.0 * a * c;
 
         let mut hi = HitInfo::default();
-        if d < 0.0 {
-            hi.t = -1.0;
-        } else {
+        if d >= 0.0 {
             hi.t = (-b - d.sqrt()) / (2.0 * a);
             hi.p = r.at(hi.t);
             hi.n = (hi.p - self.c) / self.r;
         }
 
         hi
+    }
+    fn get_random_point(&self, _rng: &mut ThreadRng) -> Vector3<f64> {
+        generate_random_sphere() * self.r + self.c
     }
 }
 
@@ -196,6 +198,13 @@ impl ObjectKind for Triangle {
 
         hi
     }
+    fn get_random_point(&self, rng: &mut ThreadRng) -> Vector3<f64> {
+        let u = rng.gen_range(0.0..1.0);
+        let v = rng.gen_range(0.0..1.0-u);
+        let w = 1.0 - u - v;
+
+        self.vp[0] * w + self.vp[1] * u + self.vp[2] * v
+    }
 }
 
 pub struct Mesh {
@@ -214,6 +223,9 @@ impl ObjectKind for Mesh {
             }
         }
         fhi.unwrap_or(HitInfo { p: Vector3::default(), n: Vector3::default(), t: -1.0 })
+    }
+    fn get_random_point(&self, rng: &mut ThreadRng) -> Vector3<f64> {
+        self.ts[rng.gen_range(0..self.ts.len())].get_random_point(rng)
     }
 }
 
@@ -267,6 +279,14 @@ impl Ray {
                 }
             }
 
+            let nee_dir = generate_random_light(s, h.p);
+            let nee_ray = Ray::new(h.p, nee_dir);
+            let nee = nee_ray.try_hit(s);
+            let nee_l = if nee.is_some() {
+                let (h, o) = nee.unwrap();
+                o.material.emit_color * (1.0 - (h.t.abs() / (h.t.abs() + 100.0))) * 0.25
+            } else { Vector3::default() } + Vector3::new(1.0, 1.0, 1.0);
+
             let specular_dir = self.direction - 2.0 * self.direction.dot(&h.n) * h.n;
             let diffuse_dir  = h.n + generate_random_sphere().normalize();
 
@@ -274,11 +294,12 @@ impl Ray {
             let srr = indirect_ray.get_color(s, i+1, tp * (1.0 - o.material.shininess * 0.5) * 1.0 / p);
 
             let c = srr.0 * o.material.shininess + o.material.color * (1.0 - o.material.shininess);
-            let l = (
-                srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35))
-                + o.material.emit_color
-            ) * (1.0 - (h.t.abs() / (h.t.abs() + 100.0)));
+            let mut l = srr.1 * (0.35 + o.material.shininess * (1.0 - 0.35)) + o.material.emit_color;
+            let lm = nee_l * (1.0 - (h.t.abs() / (h.t.abs() + 100.0))) * 0.75;
 
+            l.x *= lm.x;
+            l.y *= lm.y;
+            l.z *= lm.z;
 
             (
                 c, l, 1.0
@@ -289,6 +310,17 @@ impl Ray {
             (sc, SKY_LIGHT * (t + 0.5), 1.0)
         }
     }
+}
+
+fn generate_random_light<'a>(s: &Vec<Object<'a>>, from: Vector3<f64>) -> Vector3<f64> {
+    let mut rng = rand::thread_rng();
+    for _ in 0..RNG_LIMIT {
+        let o = &s[rng.gen_range(0..s.len())];
+        if o.material.emit_color.sum() < 0.25 { continue }
+
+        return (from - o.kind.get_random_point(&mut rng)).normalize();
+    }
+    Vector3::y()
 }
 
 fn generate_random_sphere() -> Vector3<f64> {
